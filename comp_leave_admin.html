@@ -202,11 +202,13 @@ th.total-col { background: #e4eeec; }
 .empty-msg { padding: 28px; text-align: center; color: var(--ink-soft); font-size: 13px; }
 
 /* ─── 인원관리 ─── */
-.emp-list { display: flex; flex-direction: column; gap: 8px; max-width: 480px; }
+.emp-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (max-width: 900px) { .emp-list { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .emp-list { grid-template-columns: 1fr; } }
 .emp-item {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 8px;
   background: var(--surface); border: 1.5px solid var(--line);
-  border-radius: 13px; padding: 12px 14px;
+  border-radius: 13px; padding: 10px 12px;
   cursor: grab; transition: box-shadow .12s, border-color .12s;
   user-select: none;
 }
@@ -223,7 +225,7 @@ th.total-col { background: #e4eeec; }
   flex-shrink: 0; opacity: 0; transition: opacity .12s;
 }
 .emp-item:hover .emp-del-btn { opacity: 1; }
-.emp-save-row { display: flex; gap: 10px; margin-top: 14px; max-width: 480px; }
+.emp-save-row { display: flex; gap: 10px; margin-top: 14px; }
 .emp-save-btn {
   background: linear-gradient(135deg, var(--teal), #178479);
   color: #fff; border: none; border-radius: 11px;
@@ -233,7 +235,7 @@ th.total-col { background: #e4eeec; }
   padding: 10px 16px; border-radius: 11px; font-size: 13px; font-weight: 700;
   background: #f0f4f3; color: var(--ink-soft); border: 1.5px solid var(--line);
 }
-.emp-inactive-section { margin-top: 20px; max-width: 480px; }
+.emp-inactive-section { margin-top: 20px; }
 .emp-inactive-title { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 10px; letter-spacing: .03em; }
 .emp-inactive-item {
   display: flex; align-items: center; justify-content: space-between;
@@ -504,7 +506,7 @@ function renderPersonnel() {
         <div class="emp-name">${esc(emp.name)}</div>
         <div class="emp-code">코드 ${esc(emp.employee_code || "-")}</div>
       </div>
-      <button class="emp-del-btn" onclick="deleteEmp('${emp.id}','${esc(emp.name)}')">삭제</button>
+      <button class="emp-del-btn" data-id="${emp.id}" onclick="deleteEmp(this)">삭제</button>
     </div>`).join("");
 
   document.getElementById("inactiveList").innerHTML = inactive.length
@@ -561,13 +563,12 @@ async function saveEmpOrder() {
   alert("순서가 저장되었습니다.");
 }
 
-async function deleteEmp(id, name) {
-  if (!confirm(`"${name}" 을(를) 숨김 처리합니다.\n해당 인원의 기록은 현황에서 사라집니다. 계속하시겠습니까?`)) return;
-  if (isDemo) {
-    const emp = st.employees.find(e => e.id === id);
-    if (emp) emp.status = "inactive";
-    renderAll(); return;
-  }
+async function deleteEmp(btn) {
+  const id  = btn.dataset.id;
+  const emp = st.employees.find(e => e.id === id);
+  if (!emp) return;
+  if (!confirm(`"${emp.name}" 을(를) 숨김 처리합니다.\n해당 인원의 기록은 현황에서 사라집니다. 계속하시겠습니까?`)) return;
+  if (isDemo) { emp.status = "inactive"; renderAll(); return; }
   await client.from("employees").update({ status: "inactive" }).eq("id", id);
   await refresh();
 }
