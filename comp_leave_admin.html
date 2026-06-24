@@ -376,7 +376,6 @@ th.total-col { background: #e4eeec; }
 
 <script src="./comp_leave_portal.config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
 const cfg  = window.COMP_LEAVE_PORTAL_CONFIG || {};
 const PIN  = String(cfg.adminPin || "0000");
@@ -814,6 +813,12 @@ function switchTab(name) {
 
 // ─── 엑셀 내보내기 ───
 async function exportXlsx() {
+  if (!window.ExcelJS) {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
+    document.head.appendChild(s);
+    await new Promise(r => s.onload = r);
+  }
   const wb = new ExcelJS.Workbook();
   wb.creator = "목포운항관리센터";
   const today = new Date().toISOString().slice(0,10);
