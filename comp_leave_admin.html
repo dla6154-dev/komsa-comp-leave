@@ -201,6 +201,50 @@ th.total-col { background: #e4eeec; }
 .notice.warn { background: var(--amber-soft); color: #7b521b; }
 .empty-msg { padding: 28px; text-align: center; color: var(--ink-soft); font-size: 13px; }
 
+/* ─── 인원관리 ─── */
+.emp-list { display: flex; flex-direction: column; gap: 8px; max-width: 480px; }
+.emp-item {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1.5px solid var(--line);
+  border-radius: 13px; padding: 12px 14px;
+  cursor: grab; transition: box-shadow .12s, border-color .12s;
+  user-select: none;
+}
+.emp-item.dragging { opacity: .45; border-color: var(--teal); }
+.emp-item.drag-over { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+.emp-drag-handle { color: var(--ink-soft); font-size: 16px; flex-shrink: 0; }
+.emp-order { width: 24px; text-align: center; font-size: 12px; color: var(--ink-soft); flex-shrink: 0; }
+.emp-info { flex: 1; }
+.emp-name { font-weight: 700; font-size: 14px; }
+.emp-code { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+.emp-del-btn {
+  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--danger-soft); color: var(--danger); border: none;
+  flex-shrink: 0; opacity: 0; transition: opacity .12s;
+}
+.emp-item:hover .emp-del-btn { opacity: 1; }
+.emp-save-row { display: flex; gap: 10px; margin-top: 14px; max-width: 480px; }
+.emp-save-btn {
+  background: linear-gradient(135deg, var(--teal), #178479);
+  color: #fff; border: none; border-radius: 11px;
+  padding: 10px 22px; font-size: 14px; font-weight: 800;
+}
+.emp-inactive-toggle {
+  padding: 10px 16px; border-radius: 11px; font-size: 13px; font-weight: 700;
+  background: #f0f4f3; color: var(--ink-soft); border: 1.5px solid var(--line);
+}
+.emp-inactive-section { margin-top: 20px; max-width: 480px; }
+.emp-inactive-title { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 10px; letter-spacing: .03em; }
+.emp-inactive-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #f8faf9; border: 1px solid var(--line); border-radius: 11px;
+  padding: 10px 14px; margin-bottom: 8px;
+}
+.emp-restore-btn {
+  padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--teal-soft); color: var(--teal-deep); border: none;
+}
+
 @media (max-width: 720px) {
   .summary-strip { grid-template-columns: 1fr 1fr; }
   .hol-form { grid-template-columns: 1fr 1fr; }
@@ -239,6 +283,7 @@ th.total-col { background: #e4eeec; }
     <button class="tab active" onclick="switchTab('overview')">📊 종합현황</button>
     <button class="tab" onclick="switchTab('monthly')">📅 월별사용</button>
     <button class="tab" onclick="switchTab('holidays')">🗓 휴일관리</button>
+    <button class="tab" onclick="switchTab('personnel')">👤 인원관리</button>
   </div>
 
   <!-- ─── 탭: 종합현황 ─── -->
@@ -273,6 +318,29 @@ th.total-col { background: #e4eeec; }
         </div>
       </div>
       <div class="twrap" id="monthlyTableWrap"></div>
+    </div>
+  </div>
+
+  <!-- ─── 탭: 인원관리 ─── -->
+  <div class="tab-content" id="tab-personnel">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">인원 순서 · 삭제 관리</div>
+          <div class="panel-note">드래그로 순서 변경 · 저장 버튼으로 확정 · 삭제 시 해당 인원 기록이 숨김 처리됩니다</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="emp-list" id="empList"></div>
+        <div class="emp-save-row">
+          <button class="emp-save-btn" onclick="saveEmpOrder()">순서 저장</button>
+          <button class="emp-inactive-toggle" onclick="toggleInactiveSection()">숨김 인원 보기</button>
+        </div>
+        <div class="emp-inactive-section" id="inactiveSection" style="display:none;">
+          <div class="emp-inactive-title">숨김 처리된 인원 (복원 가능)</div>
+          <div id="inactiveList"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -398,12 +466,12 @@ async function initClient() {
 async function refresh() {
   if (!client) return;
   const [er, hr, eer, ur] = await Promise.all([
-    client.from("employees").select("id,name,employee_code,status").order("name"),
+    client.from("employees").select("id,name,employee_code,status,sort_order").order("sort_order",{nullsFirst:false}).order("name"),
     client.from("comp_leave_holidays").select("id,holiday_date,holiday_name,note,is_active").order("holiday_date"),
     client.from("comp_leave_earned").select("id,employee_id,holiday_date,holiday_name,earned_hours,office,shift_type").order("holiday_date"),
     client.from("comp_leave_usage").select("id,employee_id,used_date,used_hours").order("used_date")
   ]);
-  st.employees = (er.data||[]).sort((a,b) => a.name.localeCompare(b.name,"ko"));
+  st.employees = er.data || [];
   st.holidays  = hr.data || [];
   st.earned    = eer.data || [];
   st.usage     = ur.data || [];
@@ -417,6 +485,106 @@ function renderAll() {
   renderOverview();
   renderMonthly();
   renderHolList();
+  renderPersonnel();
+}
+
+// ─── 인원관리 탭 ───
+let dragSrc = null;
+
+function renderPersonnel() {
+  const active   = st.employees.filter(e => e.status === "active");
+  const inactive = st.employees.filter(e => e.status !== "active");
+
+  document.getElementById("empList").innerHTML = active.map((emp, i) => `
+    <div class="emp-item" draggable="true" data-id="${emp.id}"
+         ondragstart="dStart(event)" ondragover="dOver(event)" ondrop="dDrop(event)" ondragend="dEnd(event)">
+      <span class="emp-drag-handle">⠿</span>
+      <span class="emp-order">${i + 1}</span>
+      <div class="emp-info">
+        <div class="emp-name">${esc(emp.name)}</div>
+        <div class="emp-code">코드 ${esc(emp.employee_code || "-")}</div>
+      </div>
+      <button class="emp-del-btn" onclick="deleteEmp('${emp.id}','${esc(emp.name)}')">삭제</button>
+    </div>`).join("");
+
+  document.getElementById("inactiveList").innerHTML = inactive.length
+    ? inactive.map(emp => `
+        <div class="emp-inactive-item">
+          <div>
+            <div style="font-weight:700;font-size:14px;">${esc(emp.name)}</div>
+            <div style="font-size:11px;color:var(--ink-soft);">코드 ${esc(emp.employee_code || "-")}</div>
+          </div>
+          <button class="emp-restore-btn" onclick="restoreEmp('${emp.id}')">복원</button>
+        </div>`).join("")
+    : `<div style="font-size:13px;color:var(--ink-soft);padding:8px 0;">숨김 인원 없음</div>`;
+}
+
+function dStart(e) {
+  dragSrc = e.currentTarget;
+  dragSrc.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+}
+function dOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  document.querySelectorAll(".emp-item").forEach(el => el.classList.remove("drag-over"));
+  if (e.currentTarget !== dragSrc) e.currentTarget.classList.add("drag-over");
+}
+function dDrop(e) {
+  e.preventDefault();
+  const target = e.currentTarget;
+  if (!dragSrc || dragSrc === target) return;
+  const list = document.getElementById("empList");
+  const items = [...list.querySelectorAll(".emp-item")];
+  const fromIdx = items.indexOf(dragSrc);
+  const toIdx   = items.indexOf(target);
+  if (fromIdx < toIdx) list.insertBefore(dragSrc, target.nextSibling);
+  else                  list.insertBefore(dragSrc, target);
+  // 번호 갱신
+  list.querySelectorAll(".emp-order").forEach((el, i) => el.textContent = i + 1);
+}
+function dEnd(e) {
+  document.querySelectorAll(".emp-item").forEach(el => {
+    el.classList.remove("dragging", "drag-over");
+  });
+  dragSrc = null;
+}
+
+async function saveEmpOrder() {
+  const items = [...document.querySelectorAll("#empList .emp-item")];
+  if (isDemo) { alert("데모 모드 — 저장되지 않습니다."); return; }
+  const updates = items.map((el, i) => ({ id: el.dataset.id, sort_order: i + 1 }));
+  for (const u of updates) {
+    await client.from("employees").update({ sort_order: u.sort_order }).eq("id", u.id);
+  }
+  await refresh();
+  alert("순서가 저장되었습니다.");
+}
+
+async function deleteEmp(id, name) {
+  if (!confirm(`"${name}" 을(를) 숨김 처리합니다.\n해당 인원의 기록은 현황에서 사라집니다. 계속하시겠습니까?`)) return;
+  if (isDemo) {
+    const emp = st.employees.find(e => e.id === id);
+    if (emp) emp.status = "inactive";
+    renderAll(); return;
+  }
+  await client.from("employees").update({ status: "inactive" }).eq("id", id);
+  await refresh();
+}
+
+async function restoreEmp(id) {
+  if (isDemo) {
+    const emp = st.employees.find(e => e.id === id);
+    if (emp) emp.status = "active";
+    renderAll(); return;
+  }
+  await client.from("employees").update({ status: "active" }).eq("id", id);
+  await refresh();
+}
+
+function toggleInactiveSection() {
+  const sec = document.getElementById("inactiveSection");
+  sec.style.display = sec.style.display === "none" ? "block" : "none";
 }
 
 // ─── 종합현황 탭 ───
