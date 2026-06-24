@@ -265,6 +265,7 @@ th.total-col { background: #e4eeec; }
     <h1 class="pin-title">관리자 페이지</h1>
     <p class="pin-sub">목포운항관리센터 휴일근로 현황</p>
     <form onsubmit="checkPin();return false;">
+      <input type="text" name="username" autocomplete="username" style="display:none;" aria-hidden="true">
       <input id="pinInput" class="pin-input" type="password" placeholder="••••" maxlength="10" autocomplete="new-password">
       <button type="submit" class="pin-btn">접속</button>
     </form>
@@ -559,7 +560,7 @@ async function saveEmpOrder() {
   if (isDemo) { alert("데모 모드 — 저장되지 않습니다."); return; }
   const updates = items.map((el, i) => ({ id: el.dataset.id, sort_order: i + 1 }));
   for (const u of updates) {
-    await client.from("employees").update({ sort_order: u.sort_order }).eq("id", u.id);
+    await client.from("employees").update({ sort_order: u.sort_order }).eq("id", u.id).select("id");
   }
   await refresh();
   alert("순서가 저장되었습니다.");
@@ -571,7 +572,7 @@ async function deleteEmp(btn) {
   if (!emp) return;
   if (!confirm(`"${emp.name}" 을(를) 숨김 처리합니다.\n해당 인원의 기록은 현황에서 사라집니다. 계속하시겠습니까?`)) return;
   if (isDemo) { emp.status = "inactive"; renderAll(); return; }
-  await client.from("employees").update({ status: "inactive" }).eq("id", id);
+  await client.from("employees").update({ status: "inactive" }).eq("id", id).select("id");
   await refresh();
 }
 
@@ -581,7 +582,7 @@ async function restoreEmp(id) {
     if (emp) emp.status = "active";
     renderAll(); return;
   }
-  await client.from("employees").update({ status: "active" }).eq("id", id);
+  await client.from("employees").update({ status: "active" }).eq("id", id).select("id");
   await refresh();
 }
 
@@ -786,7 +787,7 @@ async function saveHolEdit(id) {
     editingHolId = null; renderAll(); return;
   }
   const { error } = await client.from("comp_leave_holidays")
-    .update({ holiday_date: date, holiday_name: name, note: note || null }).eq("id", id);
+    .update({ holiday_date: date, holiday_name: name, note: note || null }).eq("id", id).select("id");
   if (error) { alert(error.message); return; }
   editingHolId = null;
   await refresh();
