@@ -1064,8 +1064,8 @@ function updateUsagePreview() {
   const newEarned = earnedAsc.filter(e => !lastUsageDate || e.holiday_date > lastUsageDate);
   const newEarnedTotal = newEarned.reduce((s,e) => s + Number(e.earned_hours||0), 0);
   const dateList = newEarned.map(e => fdShort(e.holiday_date)).join(", ");
-  const prefix = dateList ? `대체휴무(${dateList}) 근무에 따라 발생한 대체휴무 사용` : "대체휴무 사용";
-  const txt = `${prefix}(이전잔여:${fn(prevBalance)}/ 발생:+${fn(newEarnedTotal)} / 사용:-${fn(hrs)} / 총계: ${fn(prevBalance + newEarnedTotal - hrs)})`;
+  const prefix = dateList ? `공휴일(${dateList}) 근무에 따라 발생한 대체휴무 사용` : "대체휴무 사용";
+  const txt = `${prefix}(이전잔여:${fn(prevBalance)}/ 발생:+${fn(newEarnedTotal)} / 사용:-${fn(hrs)} / 총계: ${fn(prevBalance - hrs)})`;
   document.getElementById("usageTextOut").value = txt;
   document.getElementById("usageTextOut").rows = Math.ceil(txt.length / 42) + 1;
 }
