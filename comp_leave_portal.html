@@ -1044,13 +1044,9 @@ function fh(v) {
   const n = Number(v||0);
   const totalSec = Math.round(n * 3600);
   const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const hhmm = s > 0
-    ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
-    : `${h}:${String(m).padStart(2,"0")}`;
+  const m = Math.round((totalSec % 3600) / 60);
   const dec = Number(n.toFixed(4)).toString();
-  return `${hhmm} (${dec})`;
+  return `${h}:${String(m).padStart(2,"0")} (${dec})`;
 }
 function fd(v) {
   if (!v) return "-";
