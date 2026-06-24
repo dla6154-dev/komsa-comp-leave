@@ -1,0 +1,9 @@
+scripts/
+*.json
+*.pyc
+__pycache__/
+docs/
+comp_leave_mockup.html
+workbook_inspection.json
+employee_office_analysis.json
+employee_office_counts.json

@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 · 휴일근로 현황</title>
+<style>
+:root {
+  --bg: #edf3f2;
+  --surface: #fff;
+  --navy: #14394c;
+  --teal: #0f6d62;
+  --teal-deep: #0b5a51;
+  --teal-soft: #e0f2ef;
+  --ink: #13242a;
+  --ink-soft: #5e7479;
+  --line: #d5e1de;
+  --amber: #a76a24;
+  --amber-soft: #faedda;
+  --danger: #b34e57;
+  --danger-soft: #f8e7e8;
+  --radius: 18px;
+  --shadow: 0 6px 28px rgba(20,57,76,.09);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard","Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+  font-size: 15px;
+  min-height: 100vh;
+}
+button, input, select, textarea { font: inherit; cursor: pointer; }
+
+/* ─── PIN 화면 ─── */
+#pinScreen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 24px;
+}
+.pin-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 44px 32px 36px;
+  width: 100%; max-width: 360px;
+  text-align: center;
+}
+.pin-icon  { font-size: 38px; margin-bottom: 12px; }
+.pin-title { font-size: 20px; font-weight: 800; color: var(--navy); margin-bottom: 4px; }
+.pin-sub   { font-size: 13px; color: var(--ink-soft); margin-bottom: 28px; }
+.pin-input {
+  width: 100%; border: 2px solid var(--line); border-radius: 13px;
+  padding: 14px; font-size: 22px; text-align: center; letter-spacing: .3em;
+  color: var(--ink); background: #f8faf9; margin-bottom: 12px;
+}
+.pin-input:focus { outline: none; border-color: var(--teal); }
+.pin-btn {
+  width: 100%; background: linear-gradient(135deg, var(--teal), #178479);
+  color: #fff; border: none; border-radius: 13px; padding: 14px;
+  font-size: 16px; font-weight: 800;
+}
+.pin-err { margin-top: 12px; padding: 11px; border-radius: 11px; font-size: 13px; background: var(--danger-soft); color: var(--danger); display: none; }
+.pin-err.show { display: block; }
+
+/* ─── 관리자 앱 ─── */
+#adminApp { display: none; }
+
+.top-bar {
+  background: linear-gradient(145deg, #113042 0%, #19506a 60%, #0f6d62 100%);
+  padding: 18px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+}
+.top-title { color: #fff; font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+.top-right { display: flex; align-items: center; gap: 10px; }
+.top-sync  { color: rgba(255,255,255,.75); font-size: 12px; }
+.top-btn {
+  background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.22);
+  color: #fff; border-radius: 999px;
+  padding: 8px 14px; font-size: 12px; font-weight: 700;
+}
+.top-btn:hover { background: rgba(255,255,255,.22); }
+
+/* ─── 탭 ─── */
+.tabs {
+  display: flex; gap: 0;
+  background: var(--surface);
+  border-bottom: 2px solid var(--line);
+  padding: 0 20px;
+  overflow-x: auto;
+  position: sticky; top: 0; z-index: 10;
+}
+.tab {
+  padding: 14px 18px; font-size: 14px; font-weight: 700;
+  color: var(--ink-soft); border: none; background: transparent;
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  white-space: nowrap; transition: color .12s, border-color .12s;
+}
+.tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+
+.tab-content { display: none; padding: 20px; max-width: 1400px; margin: 0 auto; }
+.tab-content.active { display: block; }
+
+/* ─── 요약 박스 ─── */
+.summary-strip {
+  display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.scard {
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 18px 16px;
+}
+.scard-lbl { font-size: 11px; color: var(--ink-soft); margin-bottom: 5px; }
+.scard-val { font-size: 26px; font-weight: 900; letter-spacing: -.04em; color: var(--navy); }
+.scard-val.teal   { color: var(--teal); }
+.scard-val.danger { color: var(--danger); }
+
+/* ─── 패널 ─── */
+.panel {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden; margin-bottom: 20px;
+}
+.panel-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-bottom: 1px solid var(--line);
+  flex-wrap: wrap; gap: 10px;
+}
+.panel-title { font-size: 16px; font-weight: 800; color: var(--navy); }
+.panel-note  { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.panel-body  { padding: 20px; }
+
+/* ─── 테이블 ─── */
+.twrap {
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  max-height: 70vh;
+}
+table { width: 100%; border-collapse: collapse; background: var(--surface); }
+th, td {
+  padding: 5px 7px; border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line); text-align: center;
+  font-size: 12px; white-space: nowrap;
+}
+th:last-child, td:last-child { border-right: none; }
+thead th {
+  position: sticky; top: 0;
+  background: #f0f5f4; color: var(--navy); font-weight: 700; z-index: 2;
+}
+td.name-col, th.name-col {
+  text-align: left; position: sticky; left: 0; z-index: 3;
+  background: inherit; min-width: 80px;
+}
+thead th.name-col { background: #f0f5f4; z-index: 4; }
+td.name-col { background: #fff; }
+tr:nth-child(even) td.name-col { background: #f9fbfa; }
+tr:nth-child(even) td { background: #f9fbfa; }
+td.strong { font-weight: 800; color: var(--navy); }
+td.pos    { color: var(--teal); font-weight: 800; }
+td.neg    { color: var(--danger); font-weight: 800; }
+td.muted  { color: var(--ink-soft); }
+td.total-col { background: #f0f5f4 !important; font-weight: 800; }
+th.total-col { background: #e4eeec; }
+
+/* ─── 휴일 관리 폼 ─── */
+.hol-form { display: grid; grid-template-columns: 160px 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 16px; }
+.fg { display: grid; gap: 5px; }
+.fl { font-size: 11px; font-weight: 700; color: var(--ink-soft); letter-spacing: .03em; }
+.fi {
+  border: 1.5px solid var(--line); border-radius: 11px;
+  padding: 10px 12px; background: #f8faf9; color: var(--ink); width: 100%;
+}
+.fi:focus { outline: none; border-color: var(--teal); }
+.add-btn {
+  background: linear-gradient(135deg, var(--teal), #178479);
+  color: #fff; border: none; border-radius: 11px;
+  padding: 10px 18px; font-size: 14px; font-weight: 800;
+}
+
+/* ─── 내역 리스트 ─── */
+.hlist { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.hrow {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--line); gap: 12px;
+}
+.hrow:last-child { border-bottom: none; }
+.hrow-main { font-weight: 700; }
+.hrow-sub  { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.hrow-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.pill {
+  padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: #f0f4f3; color: var(--ink-soft); border: none;
+}
+.pill.active { background: var(--teal-soft); color: var(--teal-deep); }
+.pill.toggle { cursor: pointer; }
+
+/* ─── 알림 ─── */
+.notice { padding: 12px 14px; border-radius: 12px; font-size: 13px; margin-bottom: 14px; }
+.notice.info { background: var(--teal-soft); color: var(--teal-deep); }
+.notice.warn { background: var(--amber-soft); color: #7b521b; }
+.empty-msg { padding: 28px; text-align: center; color: var(--ink-soft); font-size: 13px; }
+
+@media (max-width: 720px) {
+  .summary-strip { grid-template-columns: 1fr 1fr; }
+  .hol-form { grid-template-columns: 1fr 1fr; }
+  .hol-form .add-btn { grid-column: 1 / -1; }
+  .tab { padding: 12px 14px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── PIN 입력 ─── -->
+<div id="pinScreen">
+  <div class="pin-card">
+    <div class="pin-icon">🔑</div>
+    <h1 class="pin-title">관리자 페이지</h1>
+    <p class="pin-sub">목포운항관리센터 휴일근로 현황</p>
+    <input id="pinInput" class="pin-input" type="password" placeholder="••••" maxlength="10">
+    <button class="pin-btn" onclick="checkPin()">접속</button>
+    <div id="pinErr" class="pin-err">비밀번호가 틀렸습니다.</div>
+  </div>
+</div>
+
+<!-- ─── 관리자 앱 ─── -->
+<div id="adminApp">
+  <div class="top-bar">
+    <span class="top-title">⚓ 목포운항관리센터 · 휴일근로 관리자</span>
+    <div class="top-right">
+      <span class="top-sync" id="syncLabel">-</span>
+      <button class="top-btn" onclick="exportXlsx()">📥 엑셀 내보내기</button>
+      <button class="top-btn" onclick="refresh()">새로고침</button>
+      <button class="top-btn" onclick="lock()">잠금</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('overview')">📊 종합현황</button>
+    <button class="tab" onclick="switchTab('monthly')">📅 월별사용</button>
+    <button class="tab" onclick="switchTab('holidays')">🗓 휴일관리</button>
+  </div>
+
+  <!-- ─── 탭: 종합현황 ─── -->
+  <div class="tab-content active" id="tab-overview">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">휴일별 대체휴가 발생 현황</div>
+          <div class="panel-note">행=직원 · 열=휴일 · 값=발생 대체휴가(h) · 엑셀 종합 시트 형식</div>
+        </div>
+      </div>
+      <div class="twrap" id="overviewTableWrap"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">직원별 잔여 대체휴가</div>
+          <div class="panel-note">총 발생 · 총 사용 · 잔여를 한눈에</div>
+        </div>
+      </div>
+      <div class="twrap" id="balanceTableWrap"></div>
+    </div>
+  </div>
+
+  <!-- ─── 탭: 월별사용 ─── -->
+  <div class="tab-content" id="tab-monthly">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">직원별 월별 대체휴가 사용 현황</div>
+          <div class="panel-note">행=직원 · 열=월 · 값=해당 월 사용시간(h) · 엑셀 월별사용 시트 형식</div>
+        </div>
+      </div>
+      <div class="twrap" id="monthlyTableWrap"></div>
+    </div>
+  </div>
+
+  <!-- ─── 탭: 휴일관리 ─── -->
+  <div class="tab-content" id="tab-holidays">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">휴일 등록</div>
+      </div>
+      <div class="panel-body">
+        <form id="holForm" class="hol-form">
+          <div class="fg">
+            <label class="fl">날짜</label>
+            <input id="hDate" class="fi" type="date" required>
+          </div>
+          <div class="fg">
+            <label class="fl">휴일명</label>
+            <input id="hName" class="fi" type="text" placeholder="예: 광복절" required>
+          </div>
+          <div class="fg">
+            <label class="fl">메모 (선택)</label>
+            <input id="hNote" class="fi" type="text" placeholder="예: 당직 배치 대상">
+          </div>
+          <button type="submit" class="add-btn">등록</button>
+        </form>
+        <div id="holList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="./comp_leave_portal.config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const cfg  = window.COMP_LEAVE_PORTAL_CONFIG || {};
+const PIN  = String(cfg.adminPin || "0000");
+let client = null;
+let isDemo = false;
+
+const DEMO_ADMIN = {
+  employees: [
+    { id:"e1", name:"김민준", employee_code:"A0", status:"active" },
+    { id:"e2", name:"이서연", employee_code:"A1", status:"active" },
+    { id:"e3", name:"박지호", employee_code:"A2", status:"active" },
+    { id:"e4", name:"최수아", employee_code:"A3", status:"active" },
+    { id:"e5", name:"정우진", employee_code:"A4", status:"active" },
+  ],
+  holidays: [
+    { id:"h1", holiday_date:"2026-01-01", holiday_name:"신정", note:null, is_active:true },
+    { id:"h2", holiday_date:"2026-03-01", holiday_name:"삼일절", note:null, is_active:true },
+    { id:"h3", holiday_date:"2026-05-05", holiday_name:"어린이날", note:null, is_active:true },
+    { id:"h4", holiday_date:"2026-06-06", holiday_name:"현충일", note:null, is_active:true },
+    { id:"h5", holiday_date:"2026-08-15", holiday_name:"광복절", note:null, is_active:true },
+  ],
+  earned: [
+    { id:"r1",  employee_id:"e1", holiday_date:"2026-01-01", holiday_name:"신정",     earned_hours:4.375, office:"센터", shift_type:"조출A" },
+    { id:"r2",  employee_id:"e2", holiday_date:"2026-01-01", holiday_name:"신정",     earned_hours:4.5,   office:"진도", shift_type:"근무A" },
+    { id:"r3",  employee_id:"e3", holiday_date:"2026-01-01", holiday_name:"신정",     earned_hours:4.0,   office:"남강", shift_type:"근무B" },
+    { id:"r4",  employee_id:"e1", holiday_date:"2026-03-01", holiday_name:"삼일절",   earned_hours:4.5,   office:"센터", shift_type:"정상" },
+    { id:"r5",  employee_id:"e2", holiday_date:"2026-03-01", holiday_name:"삼일절",   earned_hours:4.5,   office:"진도", shift_type:"근무B" },
+    { id:"r6",  employee_id:"e4", holiday_date:"2026-03-01", holiday_name:"삼일절",   earned_hours:4.0,   office:"흑산", shift_type:"근무A" },
+    { id:"r7",  employee_id:"e5", holiday_date:"2026-03-01", holiday_name:"삼일절",   earned_hours:4.375, office:"도초", shift_type:"근무B" },
+    { id:"r8",  employee_id:"e1", holiday_date:"2026-05-05", holiday_name:"어린이날", earned_hours:4.375, office:"센터", shift_type:"조출B" },
+    { id:"r9",  employee_id:"e3", holiday_date:"2026-05-05", holiday_name:"어린이날", earned_hours:4.5,   office:"남강", shift_type:"근무A" },
+    { id:"r10", employee_id:"e4", holiday_date:"2026-05-05", holiday_name:"어린이날", earned_hours:4.0,   office:"흑산", shift_type:"근무B" },
+    { id:"r11", employee_id:"e2", holiday_date:"2026-06-06", holiday_name:"현충일",   earned_hours:4.5,   office:"진도", shift_type:"근무A" },
+    { id:"r12", employee_id:"e5", holiday_date:"2026-06-06", holiday_name:"현충일",   earned_hours:4.5,   office:"도초", shift_type:"근무A" },
+  ],
+  usage: [
+    { id:"u1", employee_id:"e1", used_date:"2026-02-10", used_hours:4.375 },
+    { id:"u2", employee_id:"e2", used_date:"2026-02-14", used_hours:4.5 },
+    { id:"u3", employee_id:"e1", used_date:"2026-04-22", used_hours:4.5 },
+    { id:"u4", employee_id:"e3", used_date:"2026-05-20", used_hours:4.0 },
+    { id:"u5", employee_id:"e4", used_date:"2026-06-15", used_hours:4.0 },
+  ]
+};
+
+const st = {
+  employees: [], holidays: [], earned: [], usage: []
+};
+
+// ─── PIN ───
+document.getElementById("pinInput").addEventListener("keydown", e => { if(e.key==="Enter") checkPin(); });
+function checkPin() {
+  const v = document.getElementById("pinInput").value;
+  if (v === PIN) {
+    document.getElementById("pinScreen").style.display = "none";
+    document.getElementById("adminApp").style.display  = "block";
+    initClient();
+  } else {
+    const err = document.getElementById("pinErr");
+    err.classList.add("show");
+    setTimeout(() => err.classList.remove("show"), 2000);
+  }
+}
+
+function lock() {
+  document.getElementById("adminApp").style.display  = "none";
+  document.getElementById("pinScreen").style.display = "flex";
+  document.getElementById("pinInput").value = "";
+}
+
+// ─── 초기화 ───
+async function initClient() {
+  document.getElementById("hDate").value = new Date().toISOString().slice(0,10);
+  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+    isDemo = true;
+    st.employees = DEMO_ADMIN.employees;
+    st.holidays  = DEMO_ADMIN.holidays.map(h => ({...h}));
+    st.earned    = DEMO_ADMIN.earned;
+    st.usage     = DEMO_ADMIN.usage;
+    document.getElementById("syncLabel").textContent = "데모 모드";
+    renderAll();
+    return;
+  }
+  client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+  await refresh();
+}
+
+async function refresh() {
+  if (!client) return;
+  const [er, hr, eer, ur] = await Promise.all([
+    client.from("employees").select("id,name,employee_code,status").order("name"),
+    client.from("comp_leave_holidays").select("id,holiday_date,holiday_name,note,is_active").order("holiday_date"),
+    client.from("comp_leave_earned").select("id,employee_id,holiday_date,holiday_name,earned_hours,office,shift_type").order("holiday_date"),
+    client.from("comp_leave_usage").select("id,employee_id,used_date,used_hours").order("used_date")
+  ]);
+  st.employees = (er.data||[]).sort((a,b) => a.name.localeCompare(b.name,"ko"));
+  st.holidays  = hr.data || [];
+  st.earned    = eer.data || [];
+  st.usage     = ur.data || [];
+  const now = new Date();
+  document.getElementById("syncLabel").textContent =
+    "동기화 " + String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
+  renderAll();
+}
+
+function renderAll() {
+  renderOverview();
+  renderMonthly();
+  renderHolList();
+}
+
+// ─── 종합현황 탭 ───
+function renderOverview() {
+  const active = st.employees.filter(e => e.status === "active");
+
+  // 휴일 컬럼 (등록된 휴일 + 실제 발생 데이터의 휴일 합집합)
+  const holMap = new Map();
+  st.holidays.forEach(h => holMap.set(h.holiday_date+"::"+h.holiday_name, h));
+  st.earned.forEach(r => {
+    const k = r.holiday_date+"::"+r.holiday_name;
+    if (!holMap.has(k)) holMap.set(k, { holiday_date: r.holiday_date, holiday_name: r.holiday_name, is_active: true });
+  });
+  const hols = [...holMap.values()].sort((a,b) => a.holiday_date > b.holiday_date ? 1 : -1);
+
+  if (!active.length) {
+    document.getElementById("overviewTableWrap").innerHTML = `<div class="empty-msg">직원 데이터가 없습니다.</div>`;
+    document.getElementById("balanceTableWrap").innerHTML  = `<div class="empty-msg">직원 데이터가 없습니다.</div>`;
+    return;
+  }
+  if (!hols.length) {
+    document.getElementById("overviewTableWrap").innerHTML = `<div class="empty-msg">휴일 데이터가 없습니다. 휴일관리 탭에서 등록하세요.</div>`;
+  } else {
+    const hHead = hols.map(h =>
+      `<th title="${esc(h.holiday_name)}">${esc(fdShort(h.holiday_date))}<br><span style="font-weight:400;font-size:11px;">${esc(h.holiday_name.replace(/\(.*\)/,""))}</span></th>`
+    ).join("");
+
+    const rows = active.map(emp => {
+      const m = calcM(emp.id);
+      const cells = hols.map(h => {
+        const r = m.earned.find(x => x.holiday_date === h.holiday_date && x.holiday_name === h.holiday_name);
+        return r ? `<td class="pos">${fh(r.earned_hours)}</td>` : `<td class="muted">-</td>`;
+      }).join("");
+      const balCls = m.balance < 0 ? "neg" : "pos";
+      return `<tr>
+        <td class="name-col">${esc(emp.name)}</td>
+        <td class="muted" style="font-size:11px;">${esc(emp.employee_code||"-")}</td>
+        ${cells}
+        <td class="total-col strong">${fh(m.earnedTotal)}</td>
+        <td class="total-col strong">${fh(m.usedTotal)}</td>
+        <td class="total-col ${balCls}">${fh(m.balance)}</td>
+      </tr>`;
+    }).join("");
+
+    document.getElementById("overviewTableWrap").innerHTML = `<table>
+      <thead><tr>
+        <th class="name-col">이름</th>
+        <th>코드</th>
+        ${hHead}
+        <th class="total-col">총발생(h)</th>
+        <th class="total-col">총사용(h)</th>
+        <th class="total-col">잔여(h)</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  // 잔여 테이블
+  const balRows = active.map(emp => {
+    const m = calcM(emp.id);
+    const latest = latestOffice(emp.id);
+    const balCls = m.balance < 0 ? "neg" : "pos";
+    return `<tr>
+      <td class="name-col">${esc(emp.name)}</td>
+      <td class="muted" style="font-size:11px;">${esc(emp.employee_code||"-")}</td>
+      <td class="muted">${esc(latest)}</td>
+      <td class="strong">${fh(m.earnedTotal)}</td>
+      <td class="strong">${fh(m.usedTotal)}</td>
+      <td class="${balCls}">${fh(m.balance)}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("balanceTableWrap").innerHTML = `<table>
+    <thead><tr>
+      <th class="name-col">이름</th><th>코드</th><th>최근 근무지</th>
+      <th>총 발생(h)</th><th>총 사용(h)</th><th>잔여(h)</th>
+    </tr></thead>
+    <tbody>${balRows}</tbody>
+  </table>`;
+}
+
+// ─── 월별사용 탭 ───
+function renderMonthly() {
+  const active = st.employees.filter(e => e.status === "active");
+  if (!active.length) {
+    document.getElementById("monthlyTableWrap").innerHTML = `<div class="empty-msg">직원 데이터가 없습니다.</div>`;
+    return;
+  }
+  const months = [1,2,3,4,5,6,7,8,9,10,11,12];
+  const head = months.map(m => `<th>${m}월</th>`).join("");
+
+  const rows = active.map(emp => {
+    const m = calcM(emp.id);
+    const monthCells = months.map(mo => {
+      const used = st.usage
+        .filter(r => r.employee_id === emp.id && new Date(r.used_date).getMonth()+1 === mo)
+        .reduce((s,r) => s + Number(r.used_hours||0), 0);
+      return used > 0 ? `<td class="strong">${fh(used)}</td>` : `<td class="muted">-</td>`;
+    }).join("");
+    const balCls = m.balance < 0 ? "neg" : "pos";
+    return `<tr>
+      <td class="name-col">${esc(emp.name)}</td>
+      <td class="total-col strong">${fh(m.earnedTotal)}</td>
+      ${monthCells}
+      <td class="total-col strong">${fh(m.usedTotal)}</td>
+      <td class="total-col ${balCls}">${fh(m.balance)}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("monthlyTableWrap").innerHTML = `<table>
+    <thead><tr>
+      <th class="name-col">이름</th>
+      <th class="total-col">총발생(h)</th>
+      ${head}
+      <th class="total-col">총사용(h)</th>
+      <th class="total-col">잔여(h)</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ─── 휴일관리 탭 ───
+document.getElementById("holForm").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const date = document.getElementById("hDate").value;
+  const name = document.getElementById("hName").value.trim();
+  const note = document.getElementById("hNote").value.trim() || null;
+  if (isDemo) {
+    const existing = st.holidays.findIndex(h => h.holiday_date === date);
+    if (existing >= 0) st.holidays[existing] = { ...st.holidays[existing], holiday_name: name, note };
+    else st.holidays.push({ id:"d"+Date.now(), holiday_date:date, holiday_name:name, note, is_active:true });
+    document.getElementById("hName").value = "";
+    document.getElementById("hNote").value = "";
+    renderAll();
+    return;
+  }
+  const { error } = await client.from("comp_leave_holidays").upsert({
+    holiday_date: date, holiday_name: name, note, is_active: true
+  }, { onConflict: "holiday_date" });
+  if (error) { alert(error.message); return; }
+  document.getElementById("hName").value = "";
+  document.getElementById("hNote").value = "";
+  await refresh();
+});
+
+function renderHolList() {
+  const sorted = [...st.holidays].sort((a,b) => a.holiday_date > b.holiday_date ? 1 : -1);
+  document.getElementById("holList").innerHTML = sorted.length
+    ? `<div class="hlist">${sorted.map(h => {
+        const cnt = st.earned.filter(r => r.holiday_date === h.holiday_date && r.holiday_name === h.holiday_name).length;
+        return `<div class="hrow">
+          <div>
+            <div class="hrow-main">${esc(h.holiday_name)}</div>
+            <div class="hrow-sub">${esc(fd(h.holiday_date))}${h.note?" · "+esc(h.note):""} · 입력 ${cnt}명</div>
+          </div>
+          <div class="hrow-actions">
+            <span class="pill${h.is_active?" active":""}">${h.is_active?"사용중":"비활성"}</span>
+            <button class="pill toggle" onclick="toggleHol('${h.id}',${h.is_active})">${h.is_active?"비활성화":"활성화"}</button>
+          </div>
+        </div>`;
+      }).join("")}</div>`
+    : `<div class="empty-msg">등록된 휴일이 없습니다.</div>`;
+}
+
+async function toggleHol(id, isActive) {
+  if (isDemo) {
+    const h = st.holidays.find(h => h.id === id);
+    if (h) h.is_active = !isActive;
+    renderAll();
+    return;
+  }
+  const { error } = await client.from("comp_leave_holidays").update({ is_active: !isActive }).eq("id", id);
+  if (error) { alert(error.message); return; }
+  await refresh();
+}
+
+// ─── 탭 전환 ───
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  event.currentTarget.classList.add("active");
+  document.getElementById("tab-"+name).classList.add("active");
+}
+
+// ─── 엑셀 내보내기 ───
+function exportXlsx() {
+  const wb = XLSX.utils.book_new();
+  const active = st.employees.filter(e => e.status === "active");
+
+  // 휴일 목록 (등록 + 실제 발생 합집합)
+  const holMap = new Map();
+  st.holidays.forEach(h => holMap.set(h.holiday_date+"::"+h.holiday_name, h));
+  st.earned.forEach(r => {
+    const k = r.holiday_date+"::"+r.holiday_name;
+    if (!holMap.has(k)) holMap.set(k, { holiday_date: r.holiday_date, holiday_name: r.holiday_name });
+  });
+  const hols = [...holMap.values()].sort((a,b) => a.holiday_date > b.holiday_date ? 1 : -1);
+
+  // ── 시트1: 종합현황 ──
+  const s1Head = ["이름", "코드", ...hols.map(h => `${fdShort(h.holiday_date)}\n${h.holiday_name}`), "총발생(h)", "총사용(h)", "잔여(h)"];
+  const s1Rows = active.map(emp => {
+    const m = calcM(emp.id);
+    const cells = hols.map(h => {
+      const r = m.earned.find(x => x.holiday_date === h.holiday_date && x.holiday_name === h.holiday_name);
+      return r ? Number(Number(r.earned_hours).toFixed(4)) : "";
+    });
+    return [emp.name, emp.employee_code||"", ...cells,
+      Number(m.earnedTotal.toFixed(4)), Number(m.usedTotal.toFixed(4)), Number(m.balance.toFixed(4))];
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet([s1Head, ...s1Rows]);
+  // 합계 열 스타일 구분용 너비
+  ws1["!cols"] = [{ wch:10 }, { wch:6 }, ...hols.map(()=>({ wch:9 })), { wch:10 }, { wch:10 }, { wch:10 }];
+  XLSX.utils.book_append_sheet(wb, ws1, "종합현황");
+
+  // ── 시트2: 월별사용 ──
+  const months = [1,2,3,4,5,6,7,8,9,10,11,12];
+  const s2Head = ["이름", "총발생(h)", ...months.map(m => m+"월"), "총사용(h)", "잔여(h)"];
+  const s2Rows = active.map(emp => {
+    const m = calcM(emp.id);
+    const monthCells = months.map(mo => {
+      const used = st.usage
+        .filter(r => r.employee_id === emp.id && new Date(r.used_date).getMonth()+1 === mo)
+        .reduce((s,r) => s + Number(r.used_hours||0), 0);
+      return used > 0 ? Number(used.toFixed(4)) : "";
+    });
+    return [emp.name, Number(m.earnedTotal.toFixed(4)), ...monthCells,
+      Number(m.usedTotal.toFixed(4)), Number(m.balance.toFixed(4))];
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet([s2Head, ...s2Rows]);
+  ws2["!cols"] = [{ wch:10 }, { wch:10 }, ...months.map(()=>({ wch:7 })), { wch:10 }, { wch:10 }];
+  XLSX.utils.book_append_sheet(wb, ws2, "월별사용");
+
+  // ── 시트3: 휴일목록 ──
+  const s3Head = ["날짜", "휴일명", "메모", "활성"];
+  const s3Rows = [...st.holidays]
+    .sort((a,b) => a.holiday_date > b.holiday_date ? 1 : -1)
+    .map(h => [h.holiday_date, h.holiday_name, h.note||"", h.is_active?"활성":"비활성"]);
+  const ws3 = XLSX.utils.aoa_to_sheet([s3Head, ...s3Rows]);
+  ws3["!cols"] = [{ wch:12 }, { wch:14 }, { wch:20 }, { wch:8 }];
+  XLSX.utils.book_append_sheet(wb, ws3, "휴일목록");
+
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `휴일근로현황_${today}.xlsx`);
+}
+
+// ─── 유틸 ───
+function calcM(eId) {
+  const earned = st.earned.filter(r => r.employee_id === eId);
+  const usage  = st.usage.filter(r => r.employee_id === eId);
+  const earnedTotal = earned.reduce((s,r) => s + Number(r.earned_hours||0), 0);
+  const usedTotal   = usage.reduce((s,r) => s + Number(r.used_hours||0), 0);
+  return { earned, usage, earnedTotal, usedTotal, balance: earnedTotal - usedTotal };
+}
+function latestOffice(eId) {
+  const r = st.earned.find(x => x.employee_id === eId && x.office);
+  return r ? r.office : "-";
+}
+function fh(v) {
+  return Number(Number(v||0).toFixed(4)).toString();
+}
+function fd(v) {
+  if (!v) return "-";
+  const d = new Date(v+"T00:00:00"); if (isNaN(d)) return v;
+  return d.getFullYear()+"."+String(d.getMonth()+1).padStart(2,"0")+"."+String(d.getDate()).padStart(2,"0");
+}
+function fdShort(v) {
+  if (!v) return "";
+  const d = new Date(v+"T00:00:00"); if (isNaN(d)) return v;
+  return (d.getMonth()+1)+"/"+d.getDate();
+}
+function esc(v) {
+  return String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+</script>
+</body>
+</html>
