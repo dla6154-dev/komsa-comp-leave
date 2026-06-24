@@ -571,8 +571,8 @@ async function deleteEmp(btn) {
   const emp = st.employees.find(e => e.id === id);
   if (!emp) return;
   if (!confirm(`"${emp.name}" 을(를) 숨김 처리합니다.\n해당 인원의 기록은 현황에서 사라집니다. 계속하시겠습니까?`)) return;
-  if (isDemo) { emp.status = "inactive"; renderAll(); return; }
-  await client.from("employees").update({ status: "inactive" }).eq("id", id).select("id");
+  if (isDemo) { emp.status = "retired"; renderAll(); return; }
+  await client.from("employees").update({ status: "retired" }).eq("id", id).select("id");
   await refresh();
 }
 
