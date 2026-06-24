@@ -477,12 +477,10 @@ function renderOverview() {
   // 잔여 테이블
   const balRows = active.map(emp => {
     const m = calcM(emp.id);
-    const latest = latestOffice(emp.id);
     const balCls = m.balance < 0 ? "neg" : "pos";
     return `<tr>
       <td class="name-col">${esc(emp.name)}</td>
       <td class="muted" style="font-size:11px;">${esc(emp.employee_code||"-")}</td>
-      <td class="muted">${esc(latest)}</td>
       <td class="strong">${fh(m.earnedTotal)}</td>
       <td class="strong">${fh(m.usedTotal)}</td>
       <td class="${balCls}">${fh(m.balance)}</td>
@@ -491,7 +489,7 @@ function renderOverview() {
 
   document.getElementById("balanceTableWrap").innerHTML = `<table>
     <thead><tr>
-      <th class="name-col">이름</th><th>코드</th><th>최근 근무지</th>
+      <th class="name-col">이름</th><th>코드</th>
       <th>총 발생(h)</th><th>총 사용(h)</th><th>잔여(h)</th>
     </tr></thead>
     <tbody>${balRows}</tbody>
