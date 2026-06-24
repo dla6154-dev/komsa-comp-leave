@@ -728,33 +728,77 @@ document.getElementById("holForm").addEventListener("submit", async ev => {
   await refresh();
 });
 
+let editingHolId = null;
+
 function renderHolList() {
   const sorted = [...st.holidays].sort((a,b) => a.holiday_date > b.holiday_date ? 1 : -1);
   document.getElementById("holList").innerHTML = sorted.length
     ? `<div class="hlist">${sorted.map(h => {
         const cnt = st.earned.filter(r => r.holiday_date === h.holiday_date && r.holiday_name === h.holiday_name).length;
-        return `<div class="hrow">
+        const isEditing = h.id === editingHolId;
+        if (isEditing) {
+          return `<div class="hrow" id="hrow-${h.id}">
+            <div style="flex:1;display:grid;grid-template-columns:160px 1fr 1fr;gap:8px;align-items:center;">
+              <input class="fi" style="padding:7px 10px;font-size:12px;" id="hedit-date-${h.id}" type="date" value="${h.holiday_date}">
+              <input class="fi" style="padding:7px 10px;font-size:12px;" id="hedit-name-${h.id}" type="text" value="${esc(h.holiday_name)}">
+              <input class="fi" style="padding:7px 10px;font-size:12px;" id="hedit-note-${h.id}" type="text" value="${esc(h.note||'')}" placeholder="메모">
+            </div>
+            <div class="hrow-actions">
+              <button class="pill toggle" style="background:var(--teal-soft);color:var(--teal-deep);" onclick="saveHolEdit('${h.id}')">저장</button>
+              <button class="pill toggle" onclick="cancelHolEdit()">취소</button>
+            </div>
+          </div>`;
+        }
+        return `<div class="hrow" id="hrow-${h.id}">
           <div>
             <div class="hrow-main">${esc(h.holiday_name)}</div>
             <div class="hrow-sub">${esc(fd(h.holiday_date))}${h.note?" · "+esc(h.note):""} · 입력 ${cnt}명</div>
           </div>
           <div class="hrow-actions">
-            <span class="pill${h.is_active?" active":""}">${h.is_active?"사용중":"비활성"}</span>
-            <button class="pill toggle" onclick="toggleHol('${h.id}',${h.is_active})">${h.is_active?"비활성화":"활성화"}</button>
+            <button class="pill toggle" onclick="startHolEdit('${h.id}')">수정</button>
+            <button class="pill toggle" style="background:var(--danger-soft);color:var(--danger);" onclick="deleteHol('${h.id}','${esc(h.holiday_name)}',${cnt})">삭제</button>
           </div>
         </div>`;
       }).join("")}</div>`
     : `<div class="empty-msg">등록된 휴일이 없습니다.</div>`;
 }
 
-async function toggleHol(id, isActive) {
+function startHolEdit(id) {
+  editingHolId = id;
+  renderHolList();
+}
+function cancelHolEdit() {
+  editingHolId = null;
+  renderHolList();
+}
+
+async function saveHolEdit(id) {
+  const date = document.getElementById(`hedit-date-${id}`).value;
+  const name = document.getElementById(`hedit-name-${id}`).value.trim();
+  const note = document.getElementById(`hedit-note-${id}`).value.trim();
+  if (!date || !name) { alert("날짜와 휴일명을 입력해 주세요."); return; }
   if (isDemo) {
-    const h = st.holidays.find(h => h.id === id);
-    if (h) h.is_active = !isActive;
-    renderAll();
-    return;
+    const h = st.holidays.find(x => x.id === id);
+    if (h) { h.holiday_date = date; h.holiday_name = name; h.note = note || null; }
+    editingHolId = null; renderAll(); return;
   }
-  const { error } = await client.from("comp_leave_holidays").update({ is_active: !isActive }).eq("id", id);
+  const { error } = await client.from("comp_leave_holidays")
+    .update({ holiday_date: date, holiday_name: name, note: note || null }).eq("id", id);
+  if (error) { alert(error.message); return; }
+  editingHolId = null;
+  await refresh();
+}
+
+async function deleteHol(id, name, cnt) {
+  const msg = cnt > 0
+    ? `"${name}" 을(를) 삭제합니다.\n이 휴일로 등록된 근로 기록 ${cnt}명분이 함께 삭제됩니다.\n계속하시겠습니까?`
+    : `"${name}" 을(를) 삭제합니다. 계속하시겠습니까?`;
+  if (!confirm(msg)) return;
+  if (isDemo) {
+    st.holidays = st.holidays.filter(h => h.id !== id);
+    renderAll(); return;
+  }
+  const { error } = await client.from("comp_leave_holidays").delete().eq("id", id);
   if (error) { alert(error.message); return; }
   await refresh();
 }
