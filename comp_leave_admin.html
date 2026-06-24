@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>관리자 · 휴일근로 현황</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
 <style>
 :root {
   --bg: #edf3f2;
@@ -263,8 +264,10 @@ th.total-col { background: #e4eeec; }
     <div class="pin-icon">🔑</div>
     <h1 class="pin-title">관리자 페이지</h1>
     <p class="pin-sub">목포운항관리센터 휴일근로 현황</p>
-    <input id="pinInput" class="pin-input" type="password" placeholder="••••" maxlength="10">
-    <button class="pin-btn" onclick="checkPin()">접속</button>
+    <form onsubmit="checkPin();return false;">
+      <input id="pinInput" class="pin-input" type="password" placeholder="••••" maxlength="10">
+      <button type="submit" class="pin-btn">접속</button>
+    </form>
     <div id="pinErr" class="pin-err">비밀번호가 틀렸습니다.</div>
   </div>
 </div>
@@ -467,7 +470,7 @@ async function initClient() {
 async function refresh() {
   if (!client) return;
   const [er, hr, eer, ur] = await Promise.all([
-    client.from("employees").select("id,name,employee_code,status,sort_order").order("sort_order",{nullsFirst:false}).order("name"),
+    client.from("employees").select("id,name,employee_code,status,sort_order").order("sort_order",{ascending:true,nullsFirst:false}).order("name"),
     client.from("comp_leave_holidays").select("id,holiday_date,holiday_name,note,is_active").order("holiday_date"),
     client.from("comp_leave_earned").select("id,employee_id,holiday_date,holiday_name,earned_hours,office,shift_type").order("holiday_date"),
     client.from("comp_leave_usage").select("id,employee_id,used_date,used_hours").order("used_date")
