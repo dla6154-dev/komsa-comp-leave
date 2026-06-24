@@ -306,7 +306,7 @@ th.total-col { background: #e4eeec; }
 
 <script src="./comp_leave_portal.config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
 const cfg  = window.COMP_LEAVE_PORTAL_CONFIG || {};
 const PIN  = String(cfg.adminPin || "0000");
@@ -602,11 +602,13 @@ function switchTab(name) {
 }
 
 // ─── 엑셀 내보내기 ───
-function exportXlsx() {
-  const wb = XLSX.utils.book_new();
+async function exportXlsx() {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "목포운항관리센터";
+  const today = new Date().toISOString().slice(0,10);
+
   const active = st.employees.filter(e => e.status === "active");
 
-  // 휴일 목록 (등록 + 실제 발생 합집합)
   const holMap = new Map();
   st.holidays.forEach(h => holMap.set(h.holiday_date+"::"+h.holiday_name, h));
   st.earned.forEach(r => {
@@ -615,51 +617,136 @@ function exportXlsx() {
   });
   const hols = [...holMap.values()].sort((a,b) => a.holiday_date > b.holiday_date ? 1 : -1);
 
+  // 공통 스타일
+  const HEAD_FILL  = { type:"pattern", pattern:"solid", fgColor:{ argb:"FF14394C" } };
+  const TOT_FILL   = { type:"pattern", pattern:"solid", fgColor:{ argb:"FF0F6D62" } };
+  const ALT_FILL   = { type:"pattern", pattern:"solid", fgColor:{ argb:"FFF0F5F4" } };
+  const POS_FONT   = { color:{ argb:"FF0B5A51" }, bold:true };
+  const NEG_FONT   = { color:{ argb:"FFB34E57" }, bold:true };
+  const HEAD_FONT  = { color:{ argb:"FFFFFFFF" }, bold:true, size:10 };
+  const BORDER     = { top:{style:"thin",color:{argb:"FFD5E1DE"}}, bottom:{style:"thin",color:{argb:"FFD5E1DE"}}, left:{style:"thin",color:{argb:"FFD5E1DE"}}, right:{style:"thin",color:{argb:"FFD5E1DE"}} };
+  const CENTER     = { horizontal:"center", vertical:"middle", wrapText:true };
+  const NUM_FMT    = "0.000";
+
+  function applyHead(row, fillStyle) {
+    row.eachCell(c => {
+      c.font   = HEAD_FONT;
+      c.fill   = fillStyle || HEAD_FILL;
+      c.border = BORDER;
+      c.alignment = CENTER;
+    });
+    row.height = 32;
+  }
+  function applyData(row, colCount, totCols) {
+    row.eachCell({ includeEmpty:true }, (c, ci) => {
+      c.border = BORDER;
+      c.alignment = CENTER;
+      if (totCols && totCols.includes(ci)) {
+        c.fill = ALT_FILL;
+        c.font = { bold:true };
+      }
+    });
+  }
+
   // ── 시트1: 종합현황 ──
-  const s1Head = ["이름", "코드", ...hols.map(h => `${fdShort(h.holiday_date)}\n${h.holiday_name}`), "총발생(h)", "총사용(h)", "잔여(h)"];
-  const s1Rows = active.map(emp => {
+  const ws1 = wb.addWorksheet("종합현황");
+  ws1.views = [{ state:"frozen", xSplit:2, ySplit:1 }];
+
+  const h1Cols = [
+    { header:"이름",     width:10 },
+    { header:"코드",     width:6  },
+    ...hols.map(h => ({ header:`${fdShort(h.holiday_date)}\n${h.holiday_name}`, width:9 })),
+    { header:"총발생(h)", width:11 },
+    { header:"총사용(h)", width:11 },
+    { header:"잔여(h)",  width:11 }
+  ];
+  ws1.columns = h1Cols.map(c => ({ width: c.width }));
+  const h1r = ws1.addRow(h1Cols.map(c => c.header));
+  applyHead(h1r);
+
+  const totCols1 = [3 + hols.length, 4 + hols.length, 5 + hols.length];
+  active.forEach((emp, ri) => {
     const m = calcM(emp.id);
     const cells = hols.map(h => {
-      const r = m.earned.find(x => x.holiday_date === h.holiday_date && x.holiday_name === h.holiday_name);
-      return r ? Number(Number(r.earned_hours).toFixed(4)) : "";
+      const r = m.earned.find(x => x.holiday_date===h.holiday_date && x.holiday_name===h.holiday_name);
+      return r ? Number(Number(r.earned_hours).toFixed(3)) : null;
     });
-    return [emp.name, emp.employee_code||"", ...cells,
-      Number(m.earnedTotal.toFixed(4)), Number(m.usedTotal.toFixed(4)), Number(m.balance.toFixed(4))];
+    const row = ws1.addRow([emp.name, emp.employee_code||"", ...cells,
+      Number(m.earnedTotal.toFixed(3)), Number(m.usedTotal.toFixed(3)), Number(m.balance.toFixed(3))]);
+    if (ri % 2 === 1) row.fill = ALT_FILL;
+    applyData(row, h1Cols.length, totCols1);
+    // 발생 셀 초록
+    hols.forEach((_, hi) => {
+      const c = row.getCell(3 + hi);
+      if (c.value) { c.font = POS_FONT; c.numFmt = NUM_FMT; }
+    });
+    // 총합 열 서식
+    totCols1.forEach(ci => { row.getCell(ci).numFmt = NUM_FMT; });
+    // 잔여 색상
+    const balCell = row.getCell(5 + hols.length);
+    balCell.font = m.balance < 0 ? NEG_FONT : POS_FONT;
   });
-  const ws1 = XLSX.utils.aoa_to_sheet([s1Head, ...s1Rows]);
-  // 합계 열 스타일 구분용 너비
-  ws1["!cols"] = [{ wch:10 }, { wch:6 }, ...hols.map(()=>({ wch:9 })), { wch:10 }, { wch:10 }, { wch:10 }];
-  XLSX.utils.book_append_sheet(wb, ws1, "종합현황");
+  ws1.autoFilter = { from:"A1", to:{ row:1, column:h1Cols.length } };
 
   // ── 시트2: 월별사용 ──
+  const ws2 = wb.addWorksheet("월별사용");
+  ws2.views = [{ state:"frozen", xSplit:1, ySplit:1 }];
   const months = [1,2,3,4,5,6,7,8,9,10,11,12];
-  const s2Head = ["이름", "총발생(h)", ...months.map(m => m+"월"), "총사용(h)", "잔여(h)"];
-  const s2Rows = active.map(emp => {
+  const h2Cols = [
+    { header:"이름",     width:10 },
+    { header:"총발생(h)", width:11 },
+    ...months.map(m => ({ header:`${m}월`, width:8 })),
+    { header:"총사용(h)", width:11 },
+    { header:"잔여(h)",  width:11 }
+  ];
+  ws2.columns = h2Cols.map(c => ({ width: c.width }));
+  const h2r = ws2.addRow(h2Cols.map(c => c.header));
+  applyHead(h2r);
+
+  const totCols2 = [2, 15, 16];
+  active.forEach((emp, ri) => {
     const m = calcM(emp.id);
     const monthCells = months.map(mo => {
       const used = st.usage
-        .filter(r => r.employee_id === emp.id && new Date(r.used_date).getMonth()+1 === mo)
+        .filter(r => r.employee_id===emp.id && new Date(r.used_date).getMonth()+1===mo)
         .reduce((s,r) => s + Number(r.used_hours||0), 0);
-      return used > 0 ? Number(used.toFixed(4)) : "";
+      return used > 0 ? Number(used.toFixed(3)) : null;
     });
-    return [emp.name, Number(m.earnedTotal.toFixed(4)), ...monthCells,
-      Number(m.usedTotal.toFixed(4)), Number(m.balance.toFixed(4))];
+    const row = ws2.addRow([emp.name, Number(m.earnedTotal.toFixed(3)),
+      ...monthCells, Number(m.usedTotal.toFixed(3)), Number(m.balance.toFixed(3))]);
+    if (ri % 2 === 1) row.fill = ALT_FILL;
+    applyData(row, h2Cols.length, totCols2);
+    months.forEach((_, mi) => {
+      const c = row.getCell(3 + mi);
+      if (c.value) { c.font = { color:{ argb:"FF0B5A51" } }; c.numFmt = NUM_FMT; }
+    });
+    totCols2.forEach(ci => { row.getCell(ci).numFmt = NUM_FMT; });
+    const balCell = row.getCell(16);
+    balCell.font = m.balance < 0 ? NEG_FONT : POS_FONT;
   });
-  const ws2 = XLSX.utils.aoa_to_sheet([s2Head, ...s2Rows]);
-  ws2["!cols"] = [{ wch:10 }, { wch:10 }, ...months.map(()=>({ wch:7 })), { wch:10 }, { wch:10 }];
-  XLSX.utils.book_append_sheet(wb, ws2, "월별사용");
+  ws2.autoFilter = { from:"A1", to:{ row:1, column:h2Cols.length } };
 
   // ── 시트3: 휴일목록 ──
-  const s3Head = ["날짜", "휴일명", "메모", "활성"];
-  const s3Rows = [...st.holidays]
-    .sort((a,b) => a.holiday_date > b.holiday_date ? 1 : -1)
-    .map(h => [h.holiday_date, h.holiday_name, h.note||"", h.is_active?"활성":"비활성"]);
-  const ws3 = XLSX.utils.aoa_to_sheet([s3Head, ...s3Rows]);
-  ws3["!cols"] = [{ wch:12 }, { wch:14 }, { wch:20 }, { wch:8 }];
-  XLSX.utils.book_append_sheet(wb, ws3, "휴일목록");
+  const ws3 = wb.addWorksheet("휴일목록");
+  ws3.columns = [{ width:13 }, { width:22 }, { width:22 }, { width:8 }];
+  const h3r = ws3.addRow(["날짜", "휴일명", "메모", "활성"]);
+  applyHead(h3r);
+  [...st.holidays].sort((a,b) => a.holiday_date > b.holiday_date ? 1:-1).forEach((h, ri) => {
+    const row = ws3.addRow([h.holiday_date, h.holiday_name, h.note||"", h.is_active?"활성":"비활성"]);
+    if (ri % 2 === 1) row.fill = ALT_FILL;
+    applyData(row);
+    const sc = row.getCell(4);
+    sc.font = h.is_active ? POS_FONT : { color:{ argb:"FFB34E57" } };
+  });
 
-  const today = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `휴일근로현황_${today}.xlsx`);
+  // 다운로드
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `휴일근로현황_${today}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // ─── 유틸 ───
