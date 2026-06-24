@@ -624,7 +624,8 @@ async function exportXlsx() {
   const HEAD_FONT  = { color:{ argb:"FFFFFFFF" }, bold:true, size:10 };
   const BORDER     = { top:{style:"thin",color:{argb:"FFD5E1DE"}}, bottom:{style:"thin",color:{argb:"FFD5E1DE"}}, left:{style:"thin",color:{argb:"FFD5E1DE"}}, right:{style:"thin",color:{argb:"FFD5E1DE"}} };
   const CENTER     = { horizontal:"center", vertical:"middle", wrapText:true };
-  const NUM_FMT    = "0.000";
+  const NUM_FMT    = "0.0##";
+  const TIME_FMT   = "[h]:MM";
 
   function applyHead(row, fillStyle) {
     row.eachCell(c => {
@@ -708,7 +709,7 @@ async function exportXlsx() {
       const used = st.usage
         .filter(r => r.employee_id===emp.id && new Date(r.used_date).getMonth()+1===mo)
         .reduce((s,r) => s + Number(r.used_hours||0), 0);
-      return used > 0 ? Number(used.toFixed(3)) : null;
+      return used > 0 ? Number((used / 24).toFixed(8)) : null;
     });
     const row = ws2.addRow([emp.name, Number(m.earnedTotal.toFixed(3)),
       ...monthCells, Number(m.usedTotal.toFixed(3)), Number(m.balance.toFixed(3))]);
@@ -716,7 +717,7 @@ async function exportXlsx() {
     applyData(row, h2Cols.length, totCols2);
     months.forEach((_, mi) => {
       const c = row.getCell(3 + mi);
-      if (c.value) { c.font = { color:{ argb:"FF0B5A51" } }; c.numFmt = NUM_FMT; }
+      if (c.value) { c.font = { color:{ argb:"FF0B5A51" } }; c.numFmt = TIME_FMT; }
     });
     totCols2.forEach(ci => { row.getCell(ci).numFmt = NUM_FMT; });
     const balCell = row.getCell(16);
