@@ -203,9 +203,9 @@ th.total-col { background: #e4eeec; }
 .empty-msg { padding: 28px; text-align: center; color: var(--ink-soft); font-size: 13px; }
 
 /* ─── 인원관리 ─── */
-.emp-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-@media (max-width: 900px) { .emp-list { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 500px) { .emp-list { grid-template-columns: 1fr; } }
+.emp-list { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(10, auto); grid-auto-flow: column; gap: 8px; }
+@media (max-width: 900px) { .emp-list { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(15, auto); } }
+@media (max-width: 500px) { .emp-list { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-flow: row; } }
 .emp-item {
   display: flex; align-items: center; gap: 8px;
   background: var(--surface); border: 1.5px solid var(--line);
