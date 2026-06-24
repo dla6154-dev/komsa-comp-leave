@@ -265,7 +265,7 @@ th.total-col { background: #e4eeec; }
     <h1 class="pin-title">관리자 페이지</h1>
     <p class="pin-sub">목포운항관리센터 휴일근로 현황</p>
     <form onsubmit="checkPin();return false;">
-      <input id="pinInput" class="pin-input" type="password" placeholder="••••" maxlength="10">
+      <input id="pinInput" class="pin-input" type="password" placeholder="••••" maxlength="10" autocomplete="new-password">
       <button type="submit" class="pin-btn">접속</button>
     </form>
     <div id="pinErr" class="pin-err">비밀번호가 틀렸습니다.</div>
@@ -461,7 +461,7 @@ async function initClient() {
     renderAll();
     return;
   }
-  client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+  if (!client) client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
   await refresh();
