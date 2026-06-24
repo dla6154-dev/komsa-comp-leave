@@ -341,6 +341,28 @@ button { cursor: pointer; }
   color: var(--amber);
 }
 
+/* ─── 사용 미리보기 ─── */
+.fifo-wrap { background: #f8faf9; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
+.fifo-lbl { font-size: 11px; font-weight: 700; color: var(--ink-soft); letter-spacing: .03em; margin-bottom: 10px; }
+.fifo-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; gap: 8px; }
+.fifo-row:last-child { border-bottom: none; }
+.fifo-holiday { font-weight: 600; color: var(--ink); }
+.fifo-holiday.exhausted { color: var(--ink-soft); text-decoration: line-through; }
+.fifo-deduct { font-weight: 700; color: var(--teal-deep); white-space: nowrap; }
+.fifo-deduct.zero { color: var(--ink-soft); font-weight: 400; }
+.badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; margin-left: 4px; }
+.badge-out { background: #f8e7e8; color: var(--danger); }
+.badge-ok  { background: var(--teal-soft); color: var(--teal-deep); }
+.fifo-summary { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; margin-top: 6px; border-top: 1.5px solid var(--line); font-size: 13px; }
+.fifo-summary-before { color: var(--ink-soft); }
+.fifo-summary-after  { font-size: 16px; font-weight: 800; color: var(--navy); }
+.text-out-wrap { margin: 12px 0; }
+.text-out-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.text-out-lbl { font-size: 11px; font-weight: 700; color: var(--ink-soft); letter-spacing: .03em; }
+.copy-btn { font-size: 11px; padding: 4px 12px; border: 1.5px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-soft); font-weight: 700; }
+.copy-btn.copied { border-color: var(--teal); color: var(--teal-deep); }
+.text-out { width: 100%; font-size: 12px; font-family: monospace; line-height: 1.7; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 13px; background: #fff; color: var(--ink); resize: none; }
+
 /* ─── 시간 직접입력 ─── */
 .time-input {
   font-size: 22px; font-weight: 700;
@@ -515,6 +537,23 @@ button { cursor: pointer; }
         <div class="fg">
           <label class="fl">비고</label>
           <input id="usedNote" class="fi" type="text" placeholder="예: 오후 반차">
+        </div>
+        <div id="usageFifoWrap" style="display:none;">
+          <div class="fifo-wrap">
+            <div class="fifo-lbl">차감 내역 미리보기 (오래된 순서대로 자동 적용)</div>
+            <div id="fifoRows"></div>
+            <div class="fifo-summary">
+              <span class="fifo-summary-before" id="fifoSumBefore"></span>
+              <span class="fifo-summary-after" id="fifoSumAfter"></span>
+            </div>
+          </div>
+          <div class="text-out-wrap">
+            <div class="text-out-header">
+              <span class="text-out-lbl">대체휴무 기록 텍스트</span>
+              <button type="button" class="copy-btn" id="copyTextBtn" onclick="copyUsageText()">복사</button>
+            </div>
+            <textarea class="text-out" id="usageTextOut" rows="2" readonly></textarea>
+          </div>
         </div>
         <button type="submit" class="submit-btn" id="saveUsageBtn">저장</button>
       </form>
@@ -954,6 +993,8 @@ function renderEarned() {
 // 사용 기록
 function renderUsage() {
   document.getElementById("usedDate").value = new Date().toISOString().slice(0,10);
+  document.getElementById("usedHours").value = "";
+  document.getElementById("usageFifoWrap").style.display = "none";
   const p = getPro(); if (!p) return;
   const m = calcM(p.id);
   document.getElementById("usageBody").innerHTML = m.usage.length
@@ -966,6 +1007,78 @@ function renderUsage() {
           <div class="eval neg">-${fh(r.used_hours)}h</div>
         </div>`).join("")}</div>`
     : `<div class="notice-none">사용 기록이 없습니다.</div>`;
+}
+
+document.getElementById("usedHours").addEventListener("input", updateUsagePreview);
+document.getElementById("usedDate").addEventListener("change", updateUsagePreview);
+
+function updateUsagePreview() {
+  const p = getPro(); if (!p) return;
+  const hrs = parseFloat(document.getElementById("usedHours").value);
+  const wrap = document.getElementById("usageFifoWrap");
+  if (!hrs || hrs <= 0) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+
+  const m = calcM(p.id);
+  const prevBalance = m.balance;
+
+  // FIFO: 기존 사용량을 발생분에서 차감한 잔여 계산
+  const earnedAsc = [...m.earned].sort((a,b) => a.holiday_date < b.holiday_date ? -1 : 1);
+  let prevUsed = m.usedTotal;
+  const slots = earnedAsc.map(e => {
+    const eh = Number(e.earned_hours||0);
+    const consume = Math.min(eh, prevUsed);
+    prevUsed -= consume;
+    return { ...e, remaining: eh - consume };
+  });
+
+  // 이번 사용분 차감
+  let toDeduct = hrs;
+  const rows = slots.map(s => {
+    const deduct = Math.min(s.remaining, toDeduct);
+    toDeduct -= deduct;
+    return { ...s, thisDeduct: deduct };
+  }).filter(s => s.remaining > 0);
+
+  // 차감 행 렌더링
+  document.getElementById("fifoRows").innerHTML = rows.map(r => {
+    const isExhausted = r.thisDeduct >= r.remaining;
+    const holiday = fdShort(r.holiday_date) + " " + r.holiday_name;
+    return `<div class="fifo-row">
+      <span class="fifo-holiday${isExhausted && r.thisDeduct > 0 ? " exhausted" : ""}">${esc(holiday)}<span style="color:var(--ink-soft);font-weight:400;font-size:12px;"> (잔여 ${fn(r.remaining)}h)</span></span>
+      <span>
+        <span class="fifo-deduct${r.thisDeduct === 0 ? " zero" : ""}">-${fn(r.thisDeduct)}h</span>
+        ${r.thisDeduct > 0 && isExhausted ? '<span class="badge badge-out">소진</span>' : ""}
+        ${r.thisDeduct > 0 && !isExhausted ? '<span class="badge badge-ok">일부</span>' : ""}
+      </span>
+    </div>`;
+  }).join("") || `<div style="font-size:13px;color:var(--danger);padding:6px 0;">잔여 대체휴가가 부족합니다.</div>`;
+
+  document.getElementById("fifoSumBefore").textContent = `현재 잔여 ${fn(prevBalance)}h`;
+  document.getElementById("fifoSumAfter").textContent = `→ ${fn(prevBalance - hrs)}h`;
+
+  // 한 줄 텍스트 생성
+  const lastUsageDate = m.usage.length
+    ? [...m.usage].sort((a,b) => a.used_date > b.used_date ? -1 : 1)[0].used_date
+    : null;
+  const newEarned = earnedAsc.filter(e => !lastUsageDate || e.holiday_date > lastUsageDate);
+  const newEarnedTotal = newEarned.reduce((s,e) => s + Number(e.earned_hours||0), 0);
+  const dateList = newEarned.map(e => fdShort(e.holiday_date)).join(", ");
+  const prefix = dateList ? `대체휴무(${dateList}) 근무에 따라 발생한 대체휴무 사용` : "대체휴무 사용";
+  const txt = `${prefix}(이전잔여:${fn(prevBalance)}/ 발생:+${fn(newEarnedTotal)} / 사용:-${fn(hrs)} / 총계: ${fn(prevBalance + newEarnedTotal - hrs)})`;
+  document.getElementById("usageTextOut").value = txt;
+  document.getElementById("usageTextOut").rows = Math.ceil(txt.length / 42) + 1;
+}
+
+function copyUsageText() {
+  const txt = document.getElementById("usageTextOut").value;
+  if (!txt) return;
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = document.getElementById("copyTextBtn");
+    btn.textContent = "복사됨 ✓";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = "복사"; btn.classList.remove("copied"); }, 2000);
+  });
 }
 
 document.getElementById("usageForm").addEventListener("submit", async ev => {
@@ -1057,6 +1170,10 @@ function fdShort(v) {
   if (!v) return "";
   const d = new Date(v+"T00:00:00"); if (isNaN(d)) return v;
   return (d.getMonth()+1)+"/"+d.getDate();
+}
+function fn(v) {
+  const n = Number(v||0);
+  return Number(n.toFixed(3)).toString();
 }
 function esc(v) {
   return String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
