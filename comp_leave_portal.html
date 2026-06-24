@@ -530,8 +530,8 @@ button { cursor: pointer; }
             <input id="usedDate" class="fi" type="date" required>
           </div>
           <div class="fg">
-            <label class="fl">사용시간 (h)</label>
-            <input id="usedHours" class="fi" type="number" min="0.5" step="0.5" placeholder="예: 4" required>
+            <label class="fl">사용시간 (HH:MM)</label>
+            <input id="usedHours" class="fi time-input" type="text" placeholder="예: 04:00" maxlength="5" inputmode="numeric" autocomplete="off" required>
           </div>
         </div>
         <div class="fg">
@@ -907,25 +907,26 @@ function fillWorkForm() {
 }
 
 // 시간 자동 포맷 (숫자 4자리 입력시 콜론 삽입)
-function bindTimeInput(id) {
+function bindTimeInput(id, cb) {
   const el = document.getElementById(id);
+  const fn = cb || updateWPreview;
   el.addEventListener("input", () => {
     let v = el.value.replace(/[^0-9]/g, "");
     if (v.length >= 3) v = v.slice(0,2) + ":" + v.slice(2,4);
     el.value = v;
-    updateWPreview();
+    fn();
   });
   el.addEventListener("keydown", e => {
-    // 백스페이스가 콜론 바로 뒤에서 눌리면 콜론도 같이 삭제
     if (e.key === "Backspace" && el.value.endsWith(":")) {
       e.preventDefault();
       el.value = el.value.slice(0, -1);
-      updateWPreview();
+      fn();
     }
   });
 }
 bindTimeInput("wStart");
 bindTimeInput("wEnd");
+bindTimeInput("usedHours", updateUsagePreview);
 
 function updateWPreview() {
   const s = pTime(document.getElementById("wStart").value);
@@ -1009,12 +1010,12 @@ function renderUsage() {
     : `<div class="notice-none">사용 기록이 없습니다.</div>`;
 }
 
-document.getElementById("usedHours").addEventListener("input", updateUsagePreview);
+bindTimeInput("usedHours");
 document.getElementById("usedDate").addEventListener("change", updateUsagePreview);
 
 function updateUsagePreview() {
   const p = getPro(); if (!p) return;
-  const hrs = parseFloat(document.getElementById("usedHours").value);
+  const hrs = pTime(document.getElementById("usedHours").value);
   const wrap = document.getElementById("usageFifoWrap");
   if (!hrs || hrs <= 0) { wrap.style.display = "none"; return; }
   wrap.style.display = "block";
@@ -1085,7 +1086,7 @@ document.getElementById("usageForm").addEventListener("submit", async ev => {
   ev.preventDefault();
   const p = getPro(); if (!p) return;
   if (st.isDemo) {
-    st.usage.unshift({ id:"du-"+Date.now(), employee_id:p.id, used_date:document.getElementById("usedDate").value, used_hours:Number(document.getElementById("usedHours").value), note:document.getElementById("usedNote").value||null, created_at:new Date().toISOString() });
+    st.usage.unshift({ id:"du-"+Date.now(), employee_id:p.id, used_date:document.getElementById("usedDate").value, used_hours:pTime(document.getElementById("usedHours").value), note:document.getElementById("usedNote").value||null, created_at:new Date().toISOString() });
     document.getElementById("usageForm").reset();
     document.getElementById("usedDate").value = new Date().toISOString().slice(0,10);
     renderDash(); renderUsage(); return;
@@ -1096,7 +1097,7 @@ document.getElementById("usageForm").addEventListener("submit", async ev => {
   const { error } = await st.client.from("comp_leave_usage").insert({
     employee_id: p.id,
     used_date:  document.getElementById("usedDate").value,
-    used_hours: Number(document.getElementById("usedHours").value),
+    used_hours: pTime(document.getElementById("usedHours").value),
     note: document.getElementById("usedNote").value || null
   });
   btn.disabled = false;
